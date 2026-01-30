@@ -1,0 +1,182 @@
+erDiagram
+    ORGANIZATIONS ||--o{ USERS : "has many"
+    ORGANIZATIONS ||--o{ SUBSCRIPTIONS : "has one"
+    ORGANIZATIONS ||--o{ USAGE_METRICS : "tracks"
+    
+    USERS ||--o{ BOOKMARKS : "creates"
+    USERS ||--o{ FOLDERS : "creates"
+    USERS ||--o{ TAGS : "creates"
+    USERS ||--o{ EXPORT_JOBS : "initiates"
+    USERS ||--o{ IMPORT_JOBS : "initiates"
+    USERS ||--o{ USER_ACTIVITY : "performs"
+    USERS ||--o{ SHARED_BOOKMARKS : "shares with"
+    USERS ||--o{ SHARED_FOLDERS : "shares with"
+    
+    FOLDERS ||--o{ BOOKMARKS : "contains"
+    FOLDERS ||--o{ FOLDERS : "parent of"
+    FOLDERS ||--o{ SHARED_FOLDERS : "shared via"
+    
+    BOOKMARKS ||--o{ SHARED_BOOKMARKS : "shared via"
+    BOOKMARKS ||--o{ SYNC_LOG : "tracked in"
+    
+    ORGANIZATIONS {
+        uuid id PK
+        string name
+        string slug UK
+        string plan
+        int max_users
+        int max_bookmarks
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    USERS {
+        uuid id PK
+        uuid organization_id FK
+        string email UK
+        string password_hash
+        string name
+        string avatar_url
+        string role
+        boolean email_verified
+        boolean is_active
+        timestamp last_login_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    FOLDERS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        uuid parent_id FK
+        string name
+        string color
+        string icon
+        int position
+        boolean is_shared
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    BOOKMARKS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        uuid folder_id FK
+        text url
+        string title
+        text description
+        text notes
+        text favicon_url
+        text og_image_url
+        text og_description
+        string domain
+        array tags
+        boolean is_favorite
+        boolean is_archived
+        boolean is_public
+        int visit_count
+        timestamp last_visited_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
+    }
+    
+    TAGS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        string name
+        string color
+        int usage_count
+        timestamp created_at
+    }
+    
+    SHARED_BOOKMARKS {
+        uuid id PK
+        uuid bookmark_id FK
+        uuid shared_by FK
+        uuid shared_with FK
+        string permission
+        timestamp created_at
+    }
+    
+    SHARED_FOLDERS {
+        uuid id PK
+        uuid folder_id FK
+        uuid shared_by FK
+        uuid shared_with FK
+        string permission
+        timestamp created_at
+    }
+    
+    SYNC_LOG {
+        uuid id PK
+        uuid user_id FK
+        string device_id
+        string entity_type
+        uuid entity_id
+        string action
+        int version
+        jsonb data
+        timestamp created_at
+    }
+    
+    EXPORT_JOBS {
+        uuid id PK
+        uuid user_id FK
+        string format
+        string status
+        text file_url
+        text error_message
+        timestamp created_at
+        timestamp completed_at
+    }
+    
+    IMPORT_JOBS {
+        uuid id PK
+        uuid user_id FK
+        string source
+        string status
+        int total_items
+        int processed_items
+        int failed_items
+        jsonb error_log
+        timestamp created_at
+        timestamp completed_at
+    }
+    
+    USER_ACTIVITY {
+        bigint id PK
+        uuid user_id FK
+        string action
+        string entity_type
+        uuid entity_id
+        jsonb metadata
+        inet ip_address
+        text user_agent
+        timestamp created_at
+    }
+    
+    SUBSCRIPTIONS {
+        uuid id PK
+        uuid organization_id FK
+        string stripe_customer_id
+        string stripe_subscription_id
+        string plan
+        string status
+        timestamp current_period_start
+        timestamp current_period_end
+        timestamp cancel_at
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    USAGE_METRICS {
+        bigint id PK
+        uuid organization_id FK
+        string metric_type
+        bigint value
+        timestamp recorded_at
+    }

@@ -1,0 +1,151 @@
+graph TB
+    subgraph "Client Layer"
+        WA[Web App<br/>React + Vite]
+        MA[Mobile App<br/>React Native]
+        EXT[Browser Extension<br/>Manifest V3]
+        DA[Desktop App<br/>Electron]
+    end
+
+    subgraph "CDN & Load Balancing"
+        CF[CloudFront CDN]
+        ALB[Application Load Balancer]
+        APIGW[API Gateway<br/>Rate Limiting & Auth]
+    end
+
+    subgraph "Application Layer - Auto Scaling Group"
+        API1[API Server 1<br/>NestJS]
+        API2[API Server 2<br/>NestJS]
+        API3[API Server N<br/>NestJS]
+    end
+
+    subgraph "Worker Layer"
+        WK1[Metadata Worker<br/>URL Scraping]
+        WK2[Export Worker<br/>File Generation]
+        WK3[Email Worker<br/>Notifications]
+        WK4[Analytics Worker<br/>Data Processing]
+    end
+
+    subgraph "Data Layer"
+        PG[(PostgreSQL<br/>Primary DB)]
+        PG_R1[(Read Replica 1)]
+        PG_R2[(Read Replica 2)]
+        ES[(Elasticsearch<br/>Full-Text Search)]
+        REDIS[(Redis Cluster<br/>Cache & Sessions)]
+    end
+
+    subgraph "Storage & Queues"
+        S3[S3<br/>File Storage]
+        SQS[SQS<br/>Message Queues]
+        SNS[SNS<br/>Pub/Sub]
+    end
+
+    subgraph "Monitoring & Logging"
+        CW[CloudWatch<br/>Logs & Metrics]
+        SENTRY[Sentry<br/>Error Tracking]
+        PROM[Prometheus<br/>Metrics]
+        GRAF[Grafana<br/>Dashboards]
+    end
+
+    subgraph "External Services"
+        STRIPE[Stripe<br/>Billing]
+        SES[AWS SES<br/>Email]
+        AUTH[OAuth Providers<br/>Google, GitHub]
+    end
+
+    %% Client connections
+    WA --> CF
+    MA --> CF
+    EXT --> CF
+    DA --> CF
+    
+    CF --> APIGW
+    APIGW --> ALB
+    
+    %% Load balancer to API servers
+    ALB --> API1
+    ALB --> API2
+    ALB --> API3
+    
+    %% API to Data Layer
+    API1 --> PG
+    API2 --> PG
+    API3 --> PG
+    
+    API1 --> PG_R1
+    API2 --> PG_R1
+    API3 --> PG_R2
+    
+    API1 --> REDIS
+    API2 --> REDIS
+    API3 --> REDIS
+    
+    API1 --> ES
+    API2 --> ES
+    API3 --> ES
+    
+    %% API to Workers via Queues
+    API1 --> SQS
+    API2 --> SQS
+    API3 --> SQS
+    
+    SQS --> WK1
+    SQS --> WK2
+    SQS --> WK3
+    SQS --> WK4
+    
+    %% Workers to Data Layer
+    WK1 --> PG
+    WK2 --> PG
+    WK3 --> PG
+    WK4 --> PG
+    
+    WK1 --> S3
+    WK2 --> S3
+    
+    %% Database replication
+    PG -.->|Replication| PG_R1
+    PG -.->|Replication| PG_R2
+    
+    %% Monitoring connections
+    API1 -.-> CW
+    API2 -.-> CW
+    API3 -.-> CW
+    WK1 -.-> CW
+    WK2 -.-> CW
+    
+    API1 -.-> SENTRY
+    API2 -.-> SENTRY
+    API3 -.-> SENTRY
+    
+    PROM -.-> GRAF
+    
+    %% External service connections
+    API1 --> STRIPE
+    API1 --> AUTH
+    WK3 --> SES
+    
+    SNS --> WK3
+
+    style WA fill:#4A90E2
+    style MA fill:#4A90E2
+    style EXT fill:#4A90E2
+    style DA fill:#4A90E2
+    
+    style API1 fill:#50C878
+    style API2 fill:#50C878
+    style API3 fill:#50C878
+    
+    style WK1 fill:#FFB347
+    style WK2 fill:#FFB347
+    style WK3 fill:#FFB347
+    style WK4 fill:#FFB347
+    
+    style PG fill:#E74C3C
+    style PG_R1 fill:#E74C3C
+    style PG_R2 fill:#E74C3C
+    style ES fill:#E74C3C
+    style REDIS fill:#E74C3C
+    
+    style CF fill:#9B59B6
+    style ALB fill:#9B59B6
+    style APIGW fill:#9B59B6

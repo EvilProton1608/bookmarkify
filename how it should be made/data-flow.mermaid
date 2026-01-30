@@ -1,0 +1,125 @@
+sequenceDiagram
+    participant User
+    participant Browser
+    participant CDN
+    participant API
+    participant Cache as Redis Cache
+    participant Queue as Bull Queue
+    participant DB as PostgreSQL
+    participant Search as Elasticsearch
+    participant Worker
+    participant S3
+
+    Note over User,S3: User Creates a Bookmark
+
+    User->>Browser: Enter URL + Click Save
+    Browser->>Browser: Validate URL format
+    Browser->>API: POST /api/v1/bookmarks
+    
+    API->>API: Authenticate JWT
+    API->>API: Validate payload
+    
+    %% Check for duplicates
+    API->>Cache: Check cache for duplicate
+    Cache-->>API: Cache miss
+    API->>DB: Check URL hash for duplicate
+    DB-->>API: No duplicate found
+    
+    %% Create bookmark
+    API->>DB: INSERT bookmark (basic data)
+    DB-->>API: Bookmark created (ID: 123)
+    
+    %% Index for search
+    API->>Search: Index bookmark document
+    Search-->>API: Indexed
+    
+    %% Queue metadata fetch job
+    API->>Queue: Enqueue metadata fetch job
+    Queue-->>API: Job queued (Job ID: 456)
+    
+    %% Invalidate cache
+    API->>Cache: Delete cache: bookmarks:user:*
+    
+    %% Respond to user
+    API-->>Browser: 201 Created {bookmark}
+    Browser-->>User: Show success message
+    
+    Note over User,S3: Background: Fetch Metadata
+    
+    Queue->>Worker: Process job 456
+    Worker->>Worker: HTTP GET bookmark URL
+    Worker->>Worker: Parse HTML + Extract OG tags
+    Worker->>S3: Upload favicon image
+    S3-->>Worker: Favicon URL
+    
+    Worker->>DB: UPDATE bookmark metadata
+    DB-->>Worker: Updated
+    
+    Worker->>Search: Re-index with metadata
+    Search-->>Worker: Re-indexed
+    
+    Worker->>Queue: Job complete
+    
+    %% Real-time update via WebSocket
+    Worker->>API: Emit WebSocket event
+    API-->>Browser: WebSocket: bookmark_updated
+    Browser-->>User: Update UI with metadata
+
+    Note over User,S3: User Searches Bookmarks
+    
+    User->>Browser: Type search query
+    Browser->>Browser: Debounce 300ms
+    Browser->>API: GET /api/v1/search?q=react
+    
+    API->>Cache: Check cache: search:react
+    Cache-->>API: Cache hit
+    API-->>Browser: Cached results (fast!)
+    Browser-->>User: Display results
+    
+    Note over User,S3: Cache Miss Scenario
+    
+    User->>Browser: Search "kubernetes"
+    Browser->>API: GET /api/v1/search?q=kubernetes
+    API->>Cache: Check cache
+    Cache-->>API: Cache miss
+    
+    API->>Search: Full-text search query
+    Search-->>API: Search results
+    
+    API->>Cache: Store results (TTL: 60s)
+    API-->>Browser: Search results
+    Browser-->>User: Display results
+
+    Note over User,S3: User Exports Bookmarks
+    
+    User->>Browser: Click Export as HTML
+    Browser->>API: POST /api/v1/export {format: html}
+    
+    API->>DB: CREATE export_job
+    DB-->>API: Job created (ID: 789)
+    
+    API->>Queue: Enqueue export job
+    API-->>Browser: 202 Accepted {job_id: 789}
+    Browser-->>User: Show processing message
+    
+    Queue->>Worker: Process export job 789
+    Worker->>DB: Fetch all user bookmarks
+    DB-->>Worker: 5000 bookmarks
+    
+    Worker->>Worker: Generate HTML file
+    Worker->>S3: Upload export.html
+    S3-->>Worker: File URL
+    
+    Worker->>DB: UPDATE export_job {status: completed, url}
+    Worker->>Queue: Job complete
+    
+    Browser->>API: Poll GET /api/v1/export/789
+    API->>DB: Check job status
+    DB-->>API: Status: completed
+    API-->>Browser: {status: completed, download_url}
+    Browser-->>User: Show download button
+    
+    User->>Browser: Click download
+    Browser->>CDN: GET export file from S3 URL
+    CDN-->>Browser: File stream
+    Browser-->>User: Download complete
