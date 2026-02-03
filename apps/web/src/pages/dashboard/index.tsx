@@ -1,13 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useBookmarks } from '@/hooks/use-data';
+import { useBookmarks, useUpdateBookmark, useFolders } from '@/hooks/use-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Search, Trash2, MoreVertical, Globe, Calendar } from 'lucide-react';
+import { Search, Trash2, MoreVertical, Globe, Calendar, FolderPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { AddBookmarkDialog } from '@/components/bookmarks/add-bookmark-dialog';
+import { useDraggable } from '@dnd-kit/core';
+import { toast } from 'sonner';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuPortal,
+} from '@/components/ui/dropdown-menu';
 
 interface DashboardPageProps {
     filter?: 'favorites' | 'archive';
@@ -15,6 +29,7 @@ interface DashboardPageProps {
 
 export function DashboardPage({ filter }: DashboardPageProps) {
     const { folderId } = useParams();
+    const { data: folders } = useFolders();
 
     const [search, setSearch] = useState('');
 
@@ -81,7 +96,7 @@ export function DashboardPage({ filter }: DashboardPageProps) {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {data?.data?.map((bookmark: any) => (
-                        <BookmarkCard key={bookmark.id} bookmark={bookmark} />
+                        <BookmarkCard key={bookmark.id} bookmark={bookmark} folders={folders} />
                     ))}
                 </div>
             )}
@@ -89,61 +104,149 @@ export function DashboardPage({ filter }: DashboardPageProps) {
     );
 }
 
-function BookmarkCard({ bookmark }: { bookmark: any }) {
+function BookmarkCard({ bookmark, folders }: { bookmark: any; folders: any[] | undefined }) {
+    const { mutate: updateBookmark } = useUpdateBookmark();
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: bookmark.id,
+        data: { type: 'bookmark', bookmark }
+    });
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: isDragging ? 100 : undefined,
+    } : undefined;
+
+    const onMoveToFolder = (folderId: string) => {
+        updateBookmark(
+            { id: bookmark.id, folderId },
+            {
+                onSuccess: () => toast.success('Moved to collection'),
+                onError: () => toast.error('Failed to move bookmark'),
+            }
+        );
+    };
+
     return (
-        <Card className="flex flex-col h-full hover:shadow-md transition-all group border-muted/60 hover:border-primary/50">
-            <CardHeader className="p-4 pb-2 space-y-2">
-                <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                        {bookmark.faviconUrl ? (
-                            <img src={bookmark.faviconUrl} alt="" className="w-4 h-4 rounded-sm" />
-                        ) : (
-                            <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0 bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                                {bookmark.domain?.[0]?.toUpperCase() || 'B'}
-                            </div>
-                        )}
-                        <span className="text-xs text-muted-foreground truncate" title={bookmark.domain}>
-                            {bookmark.domain}
-                        </span>
+        <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+            <Card className="flex flex-col h-full hover:shadow-md transition-all group border-muted/60 hover:border-primary/50 cursor-grab active:cursor-grabbing">
+                <CardHeader className="p-4 pb-2 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            {bookmark.faviconUrl ? (
+                                <img src={bookmark.faviconUrl} alt="" className="w-4 h-4 rounded-sm" />
+                            ) : (
+                                <div className="w-5 h-5 rounded overflow-hidden flex-shrink-0 bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                                    {bookmark.domain?.[0]?.toUpperCase() || 'B'}
+                                </div>
+                            )}
+                            <span className="text-xs text-muted-foreground truncate" title={bookmark.domain}>
+                                {bookmark.domain}
+                            </span>
+                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    <MoreVertical className="h-3 w-3" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger onPointerDown={(e) => e.stopPropagation()}>
+                                        <FolderPlus className="mr-2 h-4 w-4" />
+                                        <span>Move to Collection</span>
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                        <DropdownMenuSubContent onPointerDown={(e) => e.stopPropagation()}>
+                                            {folders?.length === 0 ? (
+                                                <div className="p-2 text-xs text-muted-foreground">No collections found</div>
+                                            ) : (
+                                                folders?.map((folder: any) => (
+                                                    <DropdownMenuItem
+                                                        key={folder.id}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onMoveToFolder(folder.id);
+                                                        }}
+                                                    >
+                                                        {folder.name}
+                                                    </DropdownMenuItem>
+                                                ))
+                                            )}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                                <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete</span>
+                                </DropdownMenuItem>
+                                {bookmark.folderId && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onMoveToFolder(null as any);
+                                            }}
+                                        >
+                                            <FolderPlus className="mr-2 h-4 w-4 rotate-180" />
+                                            <span>Remove from Collection</span>
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-3 w-3" />
-                    </Button>
-                </div>
-                <a
-                    href={bookmark.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium hover:text-primary line-clamp-2 leading-tight block group-hover:underline decoration-primary/50 underline-offset-2"
-                >
-                    {bookmark.title}
-                </a>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 flex-1">
-                {bookmark.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1 mb-3">
-                        {bookmark.description}
-                    </p>
-                )}
-                <div className="flex flex-wrap gap-1.5 mt-auto">
-                    {bookmark.tags?.map((tag: any) => (
-                        <Badge key={tag.id} variant="secondary" className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground bg-muted hover:bg-muted/80 border-transparent">
-                            #{tag.name}
-                        </Badge>
-                    ))}
-                </div>
-            </CardContent>
-            <CardFooter className="p-3 bg-muted/5 text-xs text-muted-foreground flex justify-between items-center mt-auto border-t">
-                <span className="flex items-center gap-1.5 opacity-70">
-                    <Calendar className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(bookmark.createdAt), { addSuffix: true })}
-                </span>
-                {!bookmark.isArchived && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1">
-                        <Trash2 className="h-3 w-3" />
-                    </Button>
-                )}
-            </CardFooter>
-        </Card>
+                    <a
+                        href={bookmark.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium hover:text-primary line-clamp-2 leading-tight block group-hover:underline decoration-primary/50 underline-offset-2"
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        {bookmark.title}
+                    </a>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 flex-1">
+                    {bookmark.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1 mb-3">
+                            {bookmark.description}
+                        </p>
+                    )}
+                    <div className="flex flex-wrap gap-1.5 mt-auto">
+                        {bookmark.tags?.map((tag: any) => (
+                            <Badge key={tag.id} variant="secondary" className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground bg-muted hover:bg-muted/80 border-transparent">
+                                #{tag.name}
+                            </Badge>
+                        ))}
+                    </div>
+                </CardContent>
+                <CardFooter className="p-3 bg-muted/5 text-xs text-muted-foreground flex justify-between items-center mt-auto border-t">
+                    <span className="flex items-center gap-1.5 opacity-70">
+                        <Calendar className="h-3 w-3" />
+                        {formatDistanceToNow(new Date(bookmark.createdAt), { addSuffix: true })}
+                    </span>
+                    {!bookmark.isArchived && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1"
+                            onPointerDown={(e) => e.stopPropagation()}
+                        >
+                            <Trash2 className="h-3 w-3" />
+                        </Button>
+                    )}
+                </CardFooter>
+            </Card>
+        </div>
     );
 }

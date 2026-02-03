@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -8,13 +8,14 @@ import {
     Archive,
     Hash,
     Folder,
-    Plus,
     ChevronRight,
     ChevronDown,
     Loader2
 } from 'lucide-react';
 import { useState } from 'react';
 import { useFolders, useTags } from '@/hooks/use-data';
+import { CreateFolderDialog } from '../folders/create-folder-dialog';
+import { useDroppable } from '@dnd-kit/core';
 
 export function Sidebar() {
     const location = useLocation();
@@ -63,9 +64,7 @@ export function Sidebar() {
                         <h2 className="text-lg font-semibold tracking-tight">
                             Collections
                         </h2>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <Plus className="h-4 w-4" />
-                        </Button>
+                        <CreateFolderDialog />
                     </div>
                     <ScrollArea className="h-[250px] px-1">
                         <div className="space-y-1">
@@ -114,8 +113,14 @@ function FolderItem({ folder, level = 0 }: { folder: any; level?: number }) {
     const location = useLocation();
     const isActive = location.pathname === `/folder/${folder.id}`;
 
+    // DnD droppable
+    const { isOver, setNodeRef } = useDroppable({
+        id: `folder-${folder.id}`,
+        data: { type: 'folder', id: folder.id }
+    });
+
     return (
-        <div>
+        <div ref={setNodeRef} className={cn(isOver && "bg-accent/50 rounded-md transition-colors")}>
             <div className="flex items-center">
                 {hasChildren && (
                     <Button
