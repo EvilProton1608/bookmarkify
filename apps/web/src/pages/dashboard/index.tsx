@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useBookmarks } from '@/hooks/use-data';
+import { useBookmarks, useDeleteBookmark, useToggleFavorite, useToggleArchive, useUpdateBookmark } from '@/hooks/use-data';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Search, Trash2, MoreVertical, Globe, Calendar } from 'lucide-react';
+import { Search, Trash2, Globe, Calendar, Star, Archive } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { AddBookmarkDialog } from '@/components/bookmarks/add-bookmark-dialog';
+import { FolderPicker } from '@/components/ui/folder-picker';
 
 interface DashboardPageProps {
     filter?: 'favorites' | 'archive';
@@ -90,6 +91,27 @@ export function DashboardPage({ filter }: DashboardPageProps) {
 }
 
 function BookmarkCard({ bookmark }: { bookmark: any }) {
+    const deleteMutation = useDeleteBookmark();
+    const favoriteMutation = useToggleFavorite();
+    const archiveMutation = useToggleArchive();
+    const updateMutation = useUpdateBookmark();
+
+    const handleFavorite = () => {
+        favoriteMutation.mutate(bookmark.id);
+    };
+
+    const handleArchive = () => {
+        archiveMutation.mutate(bookmark.id);
+    };
+
+    const handleDelete = () => {
+        deleteMutation.mutate(bookmark.id);
+    };
+
+    const handleFolderSelect = (folderId: string | null) => {
+        updateMutation.mutate({ id: bookmark.id, folderId });
+    };
+
     return (
         <Card className="flex flex-col h-full hover:shadow-md transition-all group border-muted/60 hover:border-primary/50">
             <CardHeader className="p-4 pb-2 space-y-2">
@@ -106,9 +128,38 @@ function BookmarkCard({ bookmark }: { bookmark: any }) {
                             {bookmark.domain}
                         </span>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleFavorite}
+                            disabled={favoriteMutation.isPending}
+                            aria-label={bookmark.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                            title={bookmark.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                            <Star
+                                className={`h-3 w-3 ${bookmark.isFavorite ? 'fill-yellow-400 text-yellow-400' : ''}`}
+                            />
+                        </Button>
+                        <FolderPicker
+                            onSelect={handleFolderSelect}
+                            currentFolderId={bookmark.folderId}
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleArchive}
+                            disabled={archiveMutation.isPending}
+                            aria-label={bookmark.isArchived ? "Unarchive" : "Archive"}
+                            title={bookmark.isArchived ? "Unarchive" : "Archive"}
+                        >
+                            <Archive
+                                className={`h-3 w-3 ${bookmark.isArchived ? 'fill-current text-muted-foreground' : ''}`}
+                            />
+                        </Button>
+                    </div>
                 </div>
                 <a
                     href={bookmark.url}
@@ -127,7 +178,12 @@ function BookmarkCard({ bookmark }: { bookmark: any }) {
                 )}
                 <div className="flex flex-wrap gap-1.5 mt-auto">
                     {bookmark.tags?.map((tag: any) => (
-                        <Badge key={tag.id} variant="secondary" className="px-1.5 py-0 text-[10px] font-normal text-muted-foreground bg-muted hover:bg-muted/80 border-transparent">
+                        <Badge
+                            key={tag.id}
+                            color={tag.color}
+                            variant="secondary"
+                            className="px-1.5 py-0 text-[10px] font-normal"
+                        >
                             #{tag.name}
                         </Badge>
                     ))}
@@ -138,11 +194,17 @@ function BookmarkCard({ bookmark }: { bookmark: any }) {
                     <Calendar className="h-3 w-3" />
                     {formatDistanceToNow(new Date(bookmark.createdAt), { addSuffix: true })}
                 </span>
-                {!bookmark.isArchived && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1">
-                        <Trash2 className="h-3 w-3" />
-                    </Button>
-                )}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mr-1"
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                    aria-label="Delete bookmark"
+                    title="Delete bookmark"
+                >
+                    <Trash2 className="h-3 w-3" />
+                </Button>
             </CardFooter>
         </Card>
     );
