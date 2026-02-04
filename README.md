@@ -67,6 +67,13 @@ The project is organized as a monorepo:
 
 You can run development servers for each application. It is recommended to run the API and Web App in separate terminal windows.
 
+0. **Start Application**
+
+    ```bash
+    npm run dev
+    ```
+    This runs both API and Web app but not EXT
+
 1.  **Start Backend API:**
 
     ```bash
