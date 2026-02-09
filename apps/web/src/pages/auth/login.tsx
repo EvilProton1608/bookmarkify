@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const login = useAuthStore((state) => state.login);
     const { toggleTheme, isDark } = useTheme();
     const [isLoading, setIsLoading] = useState(false);
@@ -45,7 +46,8 @@ export function LoginPage() {
         try {
             await login(data);
             toast.success('Logged in successfully');
-            navigate('/');
+            const next = searchParams.get('next') || '/';
+            navigate(next);
         } catch (error) {
             toast.error('Invalid email or password');
         } finally {

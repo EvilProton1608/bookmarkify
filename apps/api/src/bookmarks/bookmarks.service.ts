@@ -4,10 +4,16 @@ import { CreateBookmarkDto } from './dto/create-bookmark.dto';
 import { UpdateBookmarkDto } from './dto/update-bookmark.dto';
 import { QueryBookmarksDto } from './dto/query-bookmarks.dto';
 import * as crypto from 'crypto';
+import { SettingsService } from '../settings/settings.service';
+import { GeminiService } from '../ai/gemini.service';
 
 @Injectable()
 export class BookmarksService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private settingsService: SettingsService,
+        private geminiService: GeminiService,
+    ) { }
 
     async create(userId: string, organizationId: string, createBookmarkDto: CreateBookmarkDto) {
         const { url, tags, ...rest } = createBookmarkDto;
@@ -29,13 +35,95 @@ export class BookmarksService {
         // Extract domain from URL
         const domain = this.extractDomain(url);
 
-        // Handle tags: find or create
-        let tagConnections: { tagId: string }[] = [];
-        if (tags && tags.length > 0) {
-            tagConnections = await this.getOrCreateTags(userId, organizationId, tags);
+        // Load settings
+        const settings = await this.settingsService.getOrCreate(userId);
+
+        // AI auto-categorize
+        let aiCategory: string | null = null;
+        let aiTags: string[] = [];
+        if (settings.aiEnabled && (settings.categories?.length || 0) > 0) {
+            const ai = await this.geminiService.categorize({
+                title: rest.title,
+                url,
+                description: rest.description || '',
+                categories: settings.categories || [],
+            });
+            aiCategory = ai.category;
+            aiTags = ai.tags;
         }
 
-        return this.prisma.bookmark.create({
+        // Decide folder based on category if no folderId provided
+        let folderId = rest.folderId;
+        let suggestedFolderName: string | null = null;
+        let suggestedFolderColor: string | null = null;
+        if (!folderId && aiCategory) {
+            const existingFolder = await this.prisma.folder.findFirst({
+                where: {
+                    userId,
+                    name: aiCategory,
+                },
+            });
+            if (existingFolder) {
+                folderId = existingFolder.id;
+            } else {
+                suggestedFolderName = aiCategory;
+                suggestedFolderColor = this.getBrandColor(domain, settings.brandColorMap);
+            }
+        }
+
+        // Merge tags: user + ai
+        const mergedTags = Array.from(
+            new Set([...(tags || []), ...(aiTags || [])].map((t) => t.trim()).filter(Boolean))
+        );
+
+        // Handle tags: find or create
+        let tagConnections: { tagId: string }[] = [];
+        if (mergedTags.length > 0) {
+            tagConnections = await this.getOrCreateTags(
+                userId,
+                organizationId,
+                mergedTags,
+                this.getBrandColor(domain, settings.brandColorMap)
+            );
+        }
+
+        if (existingBookmark && existingBookmark.deletedAt) {
+            // Restore soft-deleted bookmark instead of creating a duplicate
+            await this.prisma.bookmarkTag.deleteMany({
+                where: { bookmarkId: existingBookmark.id },
+            });
+            const restored = await this.prisma.bookmark.update({
+                where: { id: existingBookmark.id },
+                data: {
+                    ...rest,
+                    url,
+                    urlHash,
+                    domain,
+                    organizationId,
+                    folderId: folderId || null,
+                    category: aiCategory || null,
+                    aiTags,
+                    deletedAt: null,
+                    tags: {
+                        create: tagConnections.map(t => ({ tagId: t.tagId })),
+                    },
+                },
+                include: {
+                    folder: { select: { id: true, name: true, color: true } },
+                    tags: {
+                        include: { tag: { select: { id: true, name: true, color: true } } },
+                    },
+                },
+            });
+
+            return {
+                ...this.transformBookmark(restored),
+                suggestedFolderName,
+                suggestedFolderColor,
+            };
+        }
+
+        const created = await this.prisma.bookmark.create({
             data: {
                 ...rest,
                 url,
@@ -43,6 +131,9 @@ export class BookmarksService {
                 domain,
                 userId,
                 organizationId,
+                folderId: folderId || null,
+                category: aiCategory || null,
+                aiTags,
                 tags: {
                     create: tagConnections.map(t => ({ tagId: t.tagId })),
                 },
@@ -54,6 +145,12 @@ export class BookmarksService {
                 },
             },
         });
+
+        return {
+            ...this.transformBookmark(created),
+            suggestedFolderName,
+            suggestedFolderColor,
+        };
     }
 
     async findAll(userId: string, query: QueryBookmarksDto) {
@@ -217,11 +314,33 @@ export class BookmarksService {
             throw new NotFoundException('Bookmark not found');
         }
 
-        // Soft delete
-        await this.prisma.bookmark.update({
-            where: { id },
-            data: { deletedAt: new Date() },
+        // Collect tag ids linked to this bookmark
+        const tagLinks = await this.prisma.bookmarkTag.findMany({
+            where: { bookmarkId: id },
+            select: { tagId: true },
         });
+        const tagIds = tagLinks.map((t) => t.tagId);
+
+        // Soft delete and remove tag links
+        await this.prisma.$transaction([
+            this.prisma.bookmarkTag.deleteMany({ where: { bookmarkId: id } }),
+            this.prisma.bookmark.update({
+                where: { id },
+                data: { deletedAt: new Date() },
+            }),
+        ]);
+
+        // Remove tags that are no longer referenced
+        if (tagIds.length > 0) {
+            for (const tagId of tagIds) {
+                const remaining = await this.prisma.bookmarkTag.count({
+                    where: { tagId },
+                });
+                if (remaining === 0) {
+                    await this.prisma.tag.delete({ where: { id: tagId } });
+                }
+            }
+        }
 
         return { message: 'Bookmark deleted successfully' };
     }
@@ -320,6 +439,7 @@ export class BookmarksService {
         userId: string,
         organizationId: string,
         tagNames: string[],
+        color?: string | null,
     ): Promise<{ tagId: string }[]> {
         const result: { tagId: string }[] = [];
 
@@ -333,7 +453,12 @@ export class BookmarksService {
 
             if (!tag) {
                 tag = await this.prisma.tag.create({
-                    data: { name: trimmedName, userId, organizationId },
+                    data: {
+                        name: trimmedName,
+                        userId,
+                        organizationId,
+                        color: color || undefined,
+                    },
                 });
             }
 
@@ -348,5 +473,13 @@ export class BookmarksService {
             ...bookmark,
             tags: bookmark.tags?.map((bt: any) => bt.tag) || [],
         };
+    }
+
+    private getBrandColor(domain: string, brandColorMap?: any): string | null {
+        if (!domain) return null;
+        if (!brandColorMap || typeof brandColorMap !== 'object') return null;
+        const entries = Object.entries(brandColorMap) as [string, string][];
+        const match = entries.find(([key]) => domain.includes(key));
+        return match ? match[1] : null;
     }
 }

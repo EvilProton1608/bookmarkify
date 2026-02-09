@@ -9,6 +9,7 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 popup: path.resolve(__dirname, 'index.html'),
+                'connect-content': path.resolve(__dirname, 'src/connect-content.ts'),
                 background: path.resolve(__dirname, 'src/background.ts'),
             },
             output: {

@@ -7,6 +7,7 @@ import { TagsModule } from './tags/tags.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
     imports: [
@@ -16,6 +17,7 @@ import { AppService } from './app.service';
         FoldersModule,
         TagsModule,
         BookmarksModule,
+        SettingsModule,
     ],
     controllers: [AppController],
     providers: [AppService],

@@ -8,6 +8,7 @@ import { DashboardLayout } from './pages/dashboard/layout';
 import { DashboardPage } from './pages/dashboard/index';
 import { useAuthStore } from './store/auth-store';
 import { useEffect } from 'react';
+import { SettingsPage } from './pages/settings';
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ function App() {
                             <Route path="/favorites" element={<DashboardPage filter="favorites" />} />
                             <Route path="/archive" element={<DashboardPage filter="archive" />} />
                             <Route path="/folder/:folderId" element={<DashboardPage />} />
+                            <Route path="/settings" element={<SettingsPage />} />
                         </Route>
                     </Route>
 

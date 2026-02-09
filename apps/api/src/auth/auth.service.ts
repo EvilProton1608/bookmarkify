@@ -10,6 +10,7 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { DEFAULT_BRAND_COLORS, DEFAULT_CATEGORIES } from '../settings/settings.constants';
 
 interface TokenPayload {
     sub: string;
@@ -63,6 +64,15 @@ export class AuthService {
                     name: name || null,
                     organizationId: organization.id,
                     role: 'owner', // First user is owner
+                },
+            });
+
+            await tx.userSettings.create({
+                data: {
+                    userId: user.id,
+                    aiEnabled: true,
+                    categories: DEFAULT_CATEGORIES,
+                    brandColorMap: DEFAULT_BRAND_COLORS,
                 },
             });
 
@@ -174,6 +184,15 @@ export class AuthService {
                         avatarUrl,
                         organizationId: organization.id,
                         role: 'owner',
+                    },
+                });
+
+                await tx.userSettings.create({
+                    data: {
+                        userId: newUser.id,
+                        aiEnabled: true,
+                        categories: DEFAULT_CATEGORIES,
+                        brandColorMap: DEFAULT_BRAND_COLORS,
                     },
                 });
 

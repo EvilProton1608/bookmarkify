@@ -5,23 +5,41 @@
     "description": "Save and manage your bookmarks with ease.",
     "permissions": [
         "activeTab",
+        "tabs",
         "storage",
+        "bookmarks",
         "contextMenus"
     ],
-    "action": {
-        "default_popup": "index.html",
-        "default_icon": {
-            "16": "icons/icon16.png",
-            "48": "icons/icon48.png",
-            "128": "icons/icon128.png"
+    "host_permissions": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "http://localhost:5173/*",
+                "http://127.0.0.1:5173/*"
+            ],
+            "js": [
+                "src/connect-content.js"
+            ]
         }
-    },
-    "icons": {
-        "16": "icons/icon16.png",
-        "48": "icons/icon48.png",
-        "128": "icons/icon128.png"
+    ],
+    "action": {
+        "default_popup": "index.html"
     },
     "background": {
-        "service_worker": "src/background.ts"
+        "service_worker": "src/background.js",
+        "type": "module"
+    },
+    "commands": {
+        "save-current-page": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+D",
+                "mac": "Command+Shift+D"
+            },
+            "description": "Save current page to Bookmarkify"
+        }
     }
 }

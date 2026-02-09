@@ -38,6 +38,8 @@ export const useAuthStore = create<AuthState>()(
                 set({ user: data.user, isAuthenticated: true });
             },
             logout: () => {
+                // If the browser extension is installed, ask it to clear its stored tokens.
+                window.postMessage({ type: 'BOOKMARKIFY_DISCONNECT' }, window.location.origin);
                 localStorage.clear(); // Clear everything
                 set({ user: null, isAuthenticated: false });
                 window.location.href = '/login'; // Force full reload to login page

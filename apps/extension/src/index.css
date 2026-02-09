@@ -3,5 +3,60 @@
 @tailwind utilities;
 
 body {
-    @apply bg-background text-foreground;
+    @apply bg-transparent text-foreground;
+}
+
+.glass-root {
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-root::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(400px 180px at 10% 0%, rgba(120, 170, 255, 0.25), transparent 60%),
+        radial-gradient(320px 220px at 90% 10%, rgba(255, 255, 255, 0.35), transparent 60%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.2));
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+.glass-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 16px;
+    box-shadow:
+        0 12px 32px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.glass-input {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.glass-button {
+    background: rgba(59, 130, 246, 0.9);
+    color: white;
+    box-shadow:
+        0 10px 20px rgba(59, 130, 246, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.glass-button-outline {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.5);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.glass-success {
+    background: rgba(34, 197, 94, 0.15);
+    color: rgb(21, 128, 61);
+    border: 1px solid rgba(34, 197, 94, 0.35);
 }

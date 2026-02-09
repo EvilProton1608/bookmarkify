@@ -10,7 +10,8 @@ import {
     Folder,
     ChevronRight,
     ChevronDown,
-    Loader2
+    Loader2,
+    Settings
 } from 'lucide-react';
 import { useState } from 'react';
 import { useFolders, useTags, useUpdateBookmark } from '@/hooks/use-data';
@@ -55,6 +56,15 @@ export function Sidebar() {
                             >
                                 <Archive className="mr-2 h-4 w-4" />
                                 Archive
+                            </Button>
+                        </Link>
+                        <Link to="/settings">
+                            <Button
+                                variant={location.pathname === '/settings' ? 'secondary' : 'ghost'}
+                                className="w-full justify-start"
+                            >
+                                <Settings className="mr-2 h-4 w-4" />
+                                Settings
                             </Button>
                         </Link>
                     </div>

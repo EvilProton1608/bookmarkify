@@ -47,12 +47,16 @@ export function AddBookmarkDialog() {
                 ? data.tags.split(',').map((t) => t.trim()).filter(Boolean)
                 : [];
 
-            await createBookmark.mutateAsync({
+            const created = await createBookmark.mutateAsync({
                 ...data,
                 tags: tagsArray,
             });
 
-            toast.success('Bookmark added');
+            if (created?.suggestedFolderName) {
+                toast.message(`Suggestion: create collection "${created.suggestedFolderName}"`);
+            } else {
+                toast.success('Bookmark added');
+            }
             setOpen(false);
             reset();
         } catch (error) {
