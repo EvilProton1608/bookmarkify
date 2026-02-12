@@ -39,21 +39,25 @@ The project is organized as a monorepo:
     
     ```bash
     # apps/api/.env
-    DATABASE_URL="postgresql://bookmarkify:password123@localhost:5432/bookmarkify_db?schema=public"
-    JWT_SECRET="bookmarkify-super-secret-jwt-key-change-in-production"
+    DATABASE_URL="..."
+    DATABASE_DIRECT_URL="..."
+    JWT_SECRET="..."
+
+    GOOGLE_CLIENT_ID=...
+    GOOGLE_CLIENT_SECRET=...
+    GOOGLE_CALLBACK_URL=...
+
+    GITHUB_CLIENT_ID=...
+    GITHUB_CLIENT_SECRET=...
+    GITHUB_CALLBACK_URL=...
+
+    GEMINI_API_KEY="..."
+    GEMINI_MODEL="..."
     ```
 
 ### Database Setup
 
-1.  **Start the Database:**
-    
-    Use Docker Compose to start the PostgreSQL container.
-
-    ```bash
-    docker-compose up -d
-    ```
-
-2.  **Initialize the Schema:**
+1.  **Initialize the Schema:**
 
     Push the Prisma schema to the database.
 
