@@ -11,14 +11,16 @@ type Folder = {
 };
 
 type Status = { type: 'idle' | 'success' | 'error'; message?: string };
-type Tab = 'all' | 'tags' | 'favorites' | 'collections';
+type Tab = 'all' | 'favorites';
+
+const WEB_APP_URL = 'http://localhost:5173';
 
 const Popup = () => {
     const [isAuthed, setIsAuthed] = useState(false);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [tagsList, setTagsList] = useState<any[]>([]);
-    const [folderId, setFolderId] = useState<string>('');
-    const [tags, setTags] = useState('');
+    const [saveFolderId, setSaveFolderId] = useState<string>('');
+    const [saveTags, setSaveTags] = useState('');
     const [saving, setSaving] = useState(false);
     const [importing, setImporting] = useState(false);
     const [importProgress, setImportProgress] = useState({ total: 0, done: 0, skipped: 0, failed: 0 });
@@ -26,8 +28,10 @@ const Popup = () => {
     const [tab, setTab] = useState<Tab>('all');
     const [search, setSearch] = useState('');
     const [bookmarks, setBookmarks] = useState<any[]>([]);
-    const [selectedTag, setSelectedTag] = useState<string>('');
-    const [selectedFolder, setSelectedFolder] = useState<string>('');
+    const [filterTag, setFilterTag] = useState<string>('');
+    const [filterFolderId, setFilterFolderId] = useState<string>('');
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
         getTokens().then((tokens) => {
@@ -48,12 +52,12 @@ const Popup = () => {
         const params: any = { page: 1, limit: 100 };
         if (search) params.search = search;
         if (tab === 'favorites') params.isFavorite = true;
-        if (tab === 'collections' && selectedFolder) params.folderId = selectedFolder;
-        if (tab === 'tags' && selectedTag) params.tags = selectedTag;
+        if (filterFolderId) params.folderId = filterFolderId;
+        if (filterTag) params.tags = filterTag;
         listBookmarks(params)
             .then((data) => setBookmarks(data?.data || []))
             .catch(() => setBookmarks([]));
-    }, [isAuthed, tab, search, selectedFolder, selectedTag]);
+    }, [isAuthed, tab, search, filterFolderId, filterTag]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -65,7 +69,7 @@ const Popup = () => {
                 throw new Error('No active tab found.');
             }
 
-            const tagList = tags
+            const tagList = saveTags
                 .split(',')
                 .map((t) => t.trim())
                 .filter(Boolean);
@@ -74,7 +78,7 @@ const Popup = () => {
                 url: activeTab.url,
                 title: activeTab.title,
                 tags: tagList.length > 0 ? tagList : undefined,
-                folderId: folderId || undefined,
+                folderId: saveFolderId || undefined,
             });
 
             if (created?.suggestedFolderName) {
@@ -91,6 +95,11 @@ const Popup = () => {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleOpenSave = () => {
+        setStatus({ type: 'idle' });
+        setShowSaveModal(true);
     };
 
     const flattenBookmarks = (nodes: chrome.bookmarks.BookmarkTreeNode[]): chrome.bookmarks.BookmarkTreeNode[] => {
@@ -155,8 +164,10 @@ const Popup = () => {
         await clearTokens();
         setIsAuthed(false);
         setFolders([]);
-        setFolderId('');
-        setTags('');
+        setSaveFolderId('');
+        setSaveTags('');
+        setFilterFolderId('');
+        setFilterTag('');
         setStatus({ type: 'idle' });
     };
 
@@ -169,12 +180,15 @@ const Popup = () => {
                     <h1 className="text-lg font-semibold text-slate-900">Quick Save</h1>
                 </div>
                 {isAuthed && (
-                    <button
-                        className="text-xs text-slate-500 hover:text-slate-700"
-                        onClick={handleLogout}
-                    >
-                        Logout
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
+                        <button
+                            className="text-xs text-slate-500 hover:text-slate-700"
+                            onClick={handleLogout}
+                        >
+                            Logout
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -205,111 +219,23 @@ const Popup = () => {
                 </div>
             ) : (
                 <div className="space-y-3">
-                    <button
-                        className="w-full glass-success px-3 py-2 rounded text-sm cursor-default"
-                        disabled
-                    >
-                        Connection completed
-                    </button>
-
-                    <div className="flex gap-2 text-xs">
-                        {(['all', 'tags', 'favorites', 'collections'] as Tab[]).map((t) => (
-                            <button
-                                key={t}
-                                className={`px-2 py-1 rounded ${
-                                    tab === t ? 'bg-slate-900 text-white' : 'bg-white/60 text-slate-700'
-                                }`}
-                                onClick={() => {
-                                    setTab(t);
-                                    setSelectedFolder('');
-                                    setSelectedTag('');
-                                }}
-                            >
-                                {t === 'all' ? 'All' : t === 'tags' ? 'Tags' : t === 'favorites' ? 'Stars' : 'Collections'}
-                            </button>
-                        ))}
-                    </div>
-
-                    <input
-                        className="w-full glass-input rounded px-2 py-1 text-sm"
-                        placeholder="Filter..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-
-                    {tab === 'collections' && (
-                        <div className="flex flex-wrap gap-2">
-                            {folders.map((f) => (
-                                <button
-                                    key={f.id}
-                                    className={`px-2 py-1 rounded text-xs ${
-                                        selectedFolder === f.id ? 'bg-slate-900 text-white' : 'bg-white/60 text-slate-700'
-                                    }`}
-                                    onClick={() => setSelectedFolder(f.id)}
-                                >
-                                    {f.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {tab === 'tags' && (
-                        <div className="flex flex-wrap gap-2">
-                            {tagsList.map((t) => (
-                                <button
-                                    key={t.id}
-                                    className={`px-2 py-1 rounded text-xs ${
-                                        selectedTag === t.name ? 'bg-slate-900 text-white' : 'bg-white/60 text-slate-700'
-                                    }`}
-                                    onClick={() => setSelectedTag(t.name)}
-                                >
-                                    #{t.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-600">Folder</label>
-                        <select
-                            className="w-full glass-input rounded px-2 py-1 text-sm"
-                            value={folderId}
-                            onChange={(e) => setFolderId(e.target.value)}
+                    <div className="flex items-center gap-2">
+                        <button
+                            className="glass-button px-2.5 py-1 rounded text-xs disabled:opacity-60"
+                            onClick={handleOpenSave}
+                            disabled={saving}
                         >
-                            <option value="">No folder</option>
-                            {folders.map((folder) => (
-                                <option key={folder.id} value={folder.id}>
-                                    {folder.name}
-                                </option>
-                            ))}
-                        </select>
+                            {saving ? 'Saving…' : 'Save Page'}
+                        </button>
+
+                        <button
+                            className="glass-button-outline px-2.5 py-1 rounded text-xs disabled:opacity-60"
+                            onClick={handleImport}
+                            disabled={importing}
+                        >
+                            {importing ? 'Importing…' : 'Import'}
+                        </button>
                     </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs text-slate-600">Tags (comma separated)</label>
-                        <input
-                            className="w-full glass-input rounded px-2 py-1 text-sm"
-                            placeholder="productivity, ai, work"
-                            value={tags}
-                            onChange={(e) => setTags(e.target.value)}
-                        />
-                    </div>
-
-                    <button
-                        className="w-full glass-button px-3 py-2 rounded text-sm disabled:opacity-60"
-                        onClick={handleSave}
-                        disabled={saving}
-                    >
-                        {saving ? 'Saving…' : 'Save Current Page'}
-                    </button>
-
-                    <button
-                        className="w-full glass-button-outline px-3 py-2 rounded text-sm disabled:opacity-60"
-                        onClick={handleImport}
-                        disabled={importing}
-                    >
-                        {importing ? 'Importing…' : 'Import Chrome Bookmarks'}
-                    </button>
 
                     {importing && (
                         <div className="text-xs text-slate-600">
@@ -318,6 +244,79 @@ const Popup = () => {
                             {importProgress.failed > 0 && ` • ${importProgress.failed} failed`}
                         </div>
                     )}
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex gap-2 text-xs">
+                            {(['all', 'favorites'] as Tab[]).map((t) => (
+                                <button
+                                    key={t}
+                                    className={`px-2 py-1 rounded ${
+                                        tab === t ? 'bg-slate-900 text-white' : 'bg-white/60 text-slate-700'
+                                    }`}
+                                    onClick={() => setTab(t)}
+                                >
+                                    {t === 'all' ? 'All' : 'Stars'}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            className="text-xs px-2 py-1 rounded bg-white/60 text-slate-700"
+                            onClick={() => setShowFilters((prev) => !prev)}
+                        >
+                            Filter
+                        </button>
+                    </div>
+
+                    {showFilters && (
+                        <div className="space-y-2 rounded bg-white/60 p-2 text-xs">
+                            <div className="space-y-1">
+                                <label className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Collection</label>
+                                <select
+                                    className="w-full glass-input rounded px-2 py-1 text-xs"
+                                    value={filterFolderId}
+                                    onChange={(e) => setFilterFolderId(e.target.value)}
+                                >
+                                    <option value="">All collections</option>
+                                    {folders.map((folder) => (
+                                        <option key={folder.id} value={folder.id}>
+                                            {folder.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] uppercase tracking-[0.15em] text-slate-500">Tag</label>
+                                <select
+                                    className="w-full glass-input rounded px-2 py-1 text-xs"
+                                    value={filterTag}
+                                    onChange={(e) => setFilterTag(e.target.value)}
+                                >
+                                    <option value="">All tags</option>
+                                    {tagsList.map((tag) => (
+                                        <option key={tag.id} value={tag.name}>
+                                            #{tag.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                className="text-[11px] text-slate-600 hover:text-slate-900"
+                                onClick={() => {
+                                    setFilterFolderId('');
+                                    setFilterTag('');
+                                }}
+                            >
+                                Clear filters
+                            </button>
+                        </div>
+                    )}
+
+                    <input
+                        className="w-full glass-input rounded px-2 py-1 text-sm"
+                        placeholder="Search bookmarks..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
 
                     <div className="max-h-64 overflow-y-auto space-y-2 pt-2">
                         {bookmarks.map((b) => (
@@ -355,6 +354,76 @@ const Popup = () => {
                     }`}
                 >
                     {status.message}
+                </div>
+            )}
+
+            {showSaveModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+                    <div className="glass-card w-full max-w-sm p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Save options</div>
+                                <div className="text-base font-semibold text-slate-900">Add details</div>
+                            </div>
+                            <button
+                                className="text-xs text-slate-500 hover:text-slate-700"
+                                onClick={() => setShowSaveModal(false)}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs text-slate-600">Collection</label>
+                            <select
+                                className="w-full glass-input rounded px-2 py-1 text-sm"
+                                value={saveFolderId}
+                                onChange={(e) => setSaveFolderId(e.target.value)}
+                            >
+                                <option value="">No collection</option>
+                                {folders.map((folder) => (
+                                    <option key={folder.id} value={folder.id}>
+                                        {folder.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button
+                                className="text-xs text-slate-600 hover:text-slate-900"
+                                onClick={() => chrome.tabs.create({ url: WEB_APP_URL })}
+                            >
+                                Create new collection
+                            </button>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-xs text-slate-600">Tags (comma separated)</label>
+                            <input
+                                className="w-full glass-input rounded px-2 py-1 text-sm"
+                                placeholder="productivity, ai, work"
+                                value={saveTags}
+                                onChange={(e) => setSaveTags(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                className="flex-1 glass-button px-3 py-2 rounded text-sm disabled:opacity-60"
+                                onClick={async () => {
+                                    await handleSave();
+                                    setShowSaveModal(false);
+                                }}
+                                disabled={saving}
+                            >
+                                {saving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                                className="flex-1 glass-button-outline px-3 py-2 rounded text-sm"
+                                onClick={() => setShowSaveModal(false)}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
             </div>
