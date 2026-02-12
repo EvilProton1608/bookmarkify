@@ -39,7 +39,20 @@ The project is organized as a monorepo:
     
     ```bash
     # apps/api/.env
-    ask for the credentials.
+    DATABASE_URL="..."
+    DATABASE_DIRECT_URL="..."
+    JWT_SECRET="..."
+
+    GOOGLE_CLIENT_ID=...
+    GOOGLE_CLIENT_SECRET=...
+    GOOGLE_CALLBACK_URL=...
+
+    GITHUB_CLIENT_ID=...
+    GITHUB_CLIENT_SECRET=...
+    GITHUB_CALLBACK_URL=...
+
+    GEMINI_API_KEY="..."
+    GEMINI_MODEL="..."
     ```
 
 ### Database Setup
