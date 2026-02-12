@@ -168,6 +168,10 @@ const Popup = () => {
         setSaveTags('');
         setFilterFolderId('');
         setFilterTag('');
+        setTagsList([]);
+        setBookmarks([]);
+        setShowSaveModal(false);
+        setShowFilters(false);
         setStatus({ type: 'idle' });
     };
 
